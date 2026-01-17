@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import {upload} from "./upload.js";
 import { db } from "./db.js";
 import fs from "fs";
@@ -6,7 +7,9 @@ import path from 'path';
 import crypto from 'node:crypto';
 import e from "express";
 const app = express();
+app.use(cors());
 app.use(express.json())
+app.use(express.text({ type: '*/*' }))
 app.use('/uploads',express.static('uploads'));
 app.post('/upload', upload.single('file'), (req,res) =>{
     if  (!req.file){
@@ -25,33 +28,24 @@ app.post('/upload', upload.single('file'), (req,res) =>{
         }
     )
 })
-function getPass(){
-    db.all('SELECT * FROM pass',[],(err,pass)=>{
-        if (err){
-            return [false,err.message]
+function getPass(callback){
+    db.get('SELECT password FROM pass WHERE id = 1', [], (err, row) => {
+        if (err) {
+            callback(null, err.message);
+        } else {
+            callback(row?.password || null, null);
         }
-        else return [true,pass[0]];
-    })
+    });
 }
-function setPass(pass){
-    if (!getPass()){
-        db.run(`INSERT INTO pass (pass) VALUES (?)`,
-            [pass],
-            function (err){
-                if (err){
-                    return [false,err.message];
-                }
-                else{
-                    return [true]
-                }
-            }
-        )
-    }
-    else{
-        db.run(`UPDATE table SET pass = '${pass} WHERE pass = ${getPass()}'`,(err)=>{
-            return err? [false,err.message]:[true];
-        })
-    }
+
+function setPass(newPass, callback) {
+    db.run('UPDATE pass SET password = ? WHERE id = 1', [newPass], (err) => {
+        if (err) {
+            callback(false, err.message);
+        } else {
+            callback(true, null);
+        }
+    });
 }
 app.get('/files', (req, res) => {
   db.all('SELECT * FROM uploads ORDER BY time DESC', [], (err, rows) => {
@@ -77,25 +71,40 @@ app.get('/files', (req, res) => {
     return res.json(keep);
   });
 });
-app.post('/genAuth',(req,res)=>{
-    let data;
+app.post('/genAuthKey', (req, res) => {
+    const inputPassword = req.body.password;
+    
+    getPass((storedPassword, err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Database error' });
+        }
+        const now = new Date();
+        let data;
+        if (inputPassword === storedPassword) {
+            
+            data = now.toISOString().split('T')[0];
+        } else {
+            data = `${Math.floor(Math.random() * 10000)}-${Math.floor(Math.random() * 12)}-${Math.floor(Math.random() * 32)}`;
+        }
+        
+        const hash = crypto.createHash('sha512').update(data).digest('base64');
+        return res.status(200).json({ hash });
+    });
+});
+
+app.post('/auth', (req, res) => {
     const now = new Date();
-    if (req.body.pass.toLowerCase()==getPass()){
-        data = now.toISOString.split('T')[0];
+    const todayHash = crypto.createHash('sha512').update(now.toISOString().split('T')[0]).digest('base64');
+    
+    const receivedHash = typeof req.body === 'string' ? req.body : '';
+    if (!receivedHash) {
+        return res.status(400).json({ success: false, error: 'Missing auth hash' });
     }
-    else{
-        data = `${Math.floor(Math.random(0,10000))}-${Math.floor(Math.random(0,12))}-${Math.floor(Math.random(0,32))}.`;
+    
+    if (receivedHash === todayHash) {
+        return res.status(200).json({ success: true });
+    } else {
+        return res.status(401).json({ success: false });
     }
-    const hash =crypto.createHash('sha512').update(data).digest('base64');
-    return res.status(200).json({hash});
-})
-app.post('/auth',(req,res)=>{
-    if (req.body.hash == crypto.createHash('sha512').update(now.toISOString.split('T')[0]).digest('base64')){
-        return true;
-    }
-    else {
-        return false;
-    }
-})
-app.listen(3000, ()=>{console.log('Live on 3000')});
-//I need a safe way to store the password rather than in plain text...
+});
+app.listen(3001, ()=>{console.log('Backend server live on port 3001')});
