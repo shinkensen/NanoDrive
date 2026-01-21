@@ -63,14 +63,15 @@ export default function MainPage() {
 
   async function upload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     const start = Date.now();
     const xhr = new XMLHttpRequest();
-    const done = new Promise<Response>((resolve, reject) => {
+    const done = new Promise<any>((resolve, reject) => {
       xhr.onreadystatechange = () => {
         if (xhr.readyState === 4) {
           if (xhr.status >= 200 && xhr.status < 300)
-            resolve(new Response(xhr.response));
+            resolve(xhr.responseText);
           else reject(new Error(`HTTP ${xhr.status}`));
         }
       };
@@ -90,14 +91,19 @@ export default function MainPage() {
     xhr.send(formData);
     setBusy(true);
     setError(null);
-    const res = await fetch('/api/upload', { method: 'POST', body: formData });
-    setBusy(false);
-    if (!res.ok) {
+    let uploaded: any;
+    try {
+      const responseText = await done;
+      uploaded = JSON.parse(responseText);
+    } catch (err) {
       setError('Upload failed');
+      setBusy(false);
       return;
     }
-    const uploaded = await res.json();
-    e.currentTarget.reset();
+    setBusy(false);
+    form.reset();
+    setProgress(0);
+    setSpeedBps(0);
 
     setFiles((prev) => [
       {
@@ -128,11 +134,17 @@ export default function MainPage() {
           {busy ? `Uploading…${formatSpeed(speedBps)}` : 'Upload'}
         </button>
       </form>
+      {busy && (
+        <div className="progress">
+          <div className="bar" style={{ width: `${pct}%` }} />
+          <span className="pct">{pct}%</span>
+        </div>
+      )}
       {error && <p className="error">{error}</p>}
       <div className="list">
         {files.map((f) => (
           <div key={f.id} className="card">
-            <div className="name">{f.file_name}</div>
+            <div className="name">{f.name}</div>
             <div className="meta">
               {f.mime_type} • {(f.size / 1024).toFixed(1)} KB
             </div>

@@ -5,18 +5,20 @@ import { db } from "./db.js";
 import fs from "fs";
 import path from 'path';
 import crypto from 'node:crypto';
-import e from "express";
+import ffmpegStatic from 'ffmpeg-static';
+import ffmpeg from 'fluent-ffmpeg';
+import { error } from "node:console";
+ffmpeg.setFfmpegPath(ffmpegStatic);
 const app = express();
 app.use(cors());
-app.use(express.json())
-app.use(express.text({ type: '*/*' }))
+app.use(express.json({ limit: '500gb' }));
+app.use(express.text({ type: 'text/plain', limit: '1mb' }));
 app.use('/uploads',express.static('uploads'));
 app.post('/upload', upload.single('file'), (req,res) =>{
     if  (!req.file){
         return res.status(400).json({error: "File not uploaded"})
     }
     const name = req.body.name;
-    console.log(name);
     const {filename,mimetype,size,path:filePath} = req.file;
     // Store absolute path so later cleanup does not depend on process.cwd()
     const storedPath = path.resolve(process.cwd(), filePath);
@@ -107,4 +109,22 @@ app.post('/auth', (req, res) => {
         return res.status(401).json({ success: false });
     }
 });
+app.post('/convert',(req,res)=>{
+    const file = req.body.file;
+    const newFormat = req.body.format;
+    let currentFormat;
+    db.get(`SELECT mime_type FROM uploads WHERE file_name=?`,[file],(err,row)=>{
+        if (err){
+            return res.status(500).json({error: error.message});
+        }
+        if (!row){
+            return res.status(404).json({error: "File Not Found"});
+        }
+        currentFormat = row.mime_type;
+    })
+    currentFormat = currentFormat.slice(0,currentFormat.indexOf("/"));
+    if (currentFormat.slice(0,3) == ima){
+        
+    }
+})
 app.listen(3001, ()=>{console.log('Backend server live on port 3001')});
