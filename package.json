@@ -17,6 +17,7 @@
     "fluent-ffmpeg": "^2.1.3",
     "multer": "^2.0.2",
     "react-router-dom": "^7.11.0",
+    "sharp": "^0.34.5",
     "sqlite3": "^5.0.2"
   }
 }

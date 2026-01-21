@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import ffmpegStatic from 'ffmpeg-static';
 import ffmpeg from 'fluent-ffmpeg';
 import { error } from "node:console";
+import sharp from "sharp";
 ffmpeg.setFfmpegPath(ffmpegStatic);
 const app = express();
 app.use(cors());
@@ -109,10 +110,18 @@ app.post('/auth', (req, res) => {
         return res.status(401).json({ success: false });
     }
 });
+const convertVideos = (inputPath,newEnding,callback)=>{
+    const outputPat = `${file.slice(0,file.indexOf("."))}${Math.floor(Math.random()*46656).toString(36)}.${newFormat}`;
+    const outputPath = "uploads/" +outputPat;
+    ffmpeg(inputPath)
+        .output
+}
 app.post('/convert',(req,res)=>{
     const file = req.body.file;
     const newFormat = req.body.format;
+    const name = req.body.name;
     let currentFormat;
+    let size=0;
     db.get(`SELECT mime_type FROM uploads WHERE file_name=?`,[file],(err,row)=>{
         if (err){
             return res.status(500).json({error: error.message});
@@ -123,8 +132,32 @@ app.post('/convert',(req,res)=>{
         currentFormat = row.mime_type;
     })
     currentFormat = currentFormat.slice(0,currentFormat.indexOf("/"));
-    if (currentFormat.slice(0,3) == ima){
-        
+    formats =currentFormat.slice(0,currentFormat.indexOf("/"));
+    if (formats == "image"){
+        const inputPath = `uploads/${file}`;
+        const outputPat = `${file.slice(0,file.indexOf("."))}${Math.floor(Math.random()*46656).toString(36)}.${newFormat}`;
+        const outputPath = "uploads/" +outputPat;
+        sharp(inputPath)
+            .toFormat(newFormat)
+            .toFile(outputPath, (err,info)=>{
+                if (err){
+                    return res.status(500).json({error: err.message});
+                }
+                size= info.size;
+            })
+        let mimetype= "image/" + newFormat;
+        db.run(`INSERT INTO uploads (name, file_name, mime_type, path, size) VALUES (?,?,?,?,?)`,
+            [name, outputPat, "image/" + newFormat, outputPath, size],
+            function (err){
+                if (err) return res.status(500).json({error: err.message});
+                return res.json({id: this.lastID,name,outputPat,mimetype,size,url: `/uploads/${filename}`})
+            }
+        )
+        const fullPath = path.resolve(process.cwd(), outputPat);
+        return res.status(200).json({path: fullPath,info})
+    }
+    if (formats == "video"){
+
     }
 })
 app.listen(3001, ()=>{console.log('Backend server live on port 3001')});
