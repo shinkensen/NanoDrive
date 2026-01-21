@@ -9,6 +9,7 @@ import ffmpegStatic from 'ffmpeg-static';
 import ffmpeg from 'fluent-ffmpeg';
 import { error } from "node:console";
 import sharp from "sharp";
+import { pathToFileURL } from "node:url";
 ffmpeg.setFfmpegPath(ffmpegStatic);
 const app = express();
 app.use(cors());
@@ -111,10 +112,20 @@ app.post('/auth', (req, res) => {
     }
 });
 const convertVideos = (inputPath,newEnding,callback)=>{
-    const outputPat = `${file.slice(0,file.indexOf("."))}${Math.floor(Math.random()*46656).toString(36)}.${newFormat}`;
+    const outputPat = `${file.slice(0,file.indexOf("."))}${Math.floor(Math.random()*46656).toString(36)}.${newEnding}`;
     const outputPath = "uploads/" +outputPat;
     ffmpeg(inputPath)
-        .output
+        .output(outputPath)
+        .on('end',()=>{
+            if(callback){
+                callback(null,outputPath);
+            }
+        })
+        .on('error',(err)=>{
+            if (callback){
+                callback(err);
+            }
+        })
 }
 app.post('/convert',(req,res)=>{
     const file = req.body.file;
@@ -154,10 +165,18 @@ app.post('/convert',(req,res)=>{
             }
         )
         const fullPath = path.resolve(process.cwd(), outputPat);
-        return res.status(200).json({path: fullPath,info})
+        //yea i think this will work... hopefully
+        return res.status(200).json({path: fullPath,info});
     }
     if (formats == "video"){
-
+        let convertedPath,fullConvertedPath;
+        convertVideos(file,newFormat,(err,fullPath,path)=>{
+            if (err){
+                return res.status(500).json({error:err});
+            }
+            convertedPath =path;
+            fullConvertedPath = fullPath;
+        })
     }
 })
 app.listen(3001, ()=>{console.log('Backend server live on port 3001')});
