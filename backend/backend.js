@@ -10,6 +10,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import { error } from "node:console";
 import sharp from "sharp";
 import { pathToFileURL } from "node:url";
+import { url } from "node:inspector";
 ffmpeg.setFfmpegPath(ffmpegStatic);
 const app = express();
 app.use(cors());
@@ -118,7 +119,7 @@ const convertVideos = (inputPath,newEnding,callback)=>{
         .output(outputPath)
         .on('end',()=>{
             if(callback){
-                callback(null,outputPath);
+                callback(null,outputPath, outputPat);
             }
         })
         .on('error',(err)=>{
@@ -156,17 +157,17 @@ app.post('/convert',(req,res)=>{
                 }
                 size= info.size;
             })
-        let mimetype= "image/" + newFormat;
+        const mimetype= "image/" + newFormat;
+        const fullPath = path.resolve(process.cwd(), outputPat);
         db.run(`INSERT INTO uploads (name, file_name, mime_type, path, size) VALUES (?,?,?,?,?)`,
-            [name, outputPat, "image/" + newFormat, outputPath, size],
+            [name, outputPat, mimetype, outputPath, size],
             function (err){
                 if (err) return res.status(500).json({error: err.message});
-                return res.json({id: this.lastID,name,outputPat,mimetype,size,url: `/uploads/${filename}`})
+                return res.json({id: this.lastID,name,outputPat,mimetype,size,url: `/uploads/${filename}`,fullPath})
             }
         )
-        const fullPath = path.resolve(process.cwd(), outputPat);
+        
         //yea i think this will work... hopefully
-        return res.status(200).json({path: fullPath,info});
     }
     if (formats == "video"){
         let convertedPath,fullConvertedPath;
@@ -177,6 +178,21 @@ app.post('/convert',(req,res)=>{
             convertedPath =path;
             fullConvertedPath = fullPath;
         })
-    }
+        let size = 0;
+        fs.stat(fullConvertedPath,(err,stats)=>{
+            if (err){
+                return res.status(500).json({err});
+            }
+            else{
+                size = stats.size;
+            }
+        })
+        const mimetype ="image/" + newFormat;
+        db.run(`INSERT INTO uploads (name, file_name, mime_type, path, size) VALUES (?,?,?,?,?)`,
+            [name,convertedPath,mimetype,fullConvertedPath,size], (err)=>{
+                if (err) return res.status(500).json({error: err.message});
+                return res.json({id:this.lastID,name,convertedPath,mimetype,size,url: `/uploads/${filename}`})
+            })
+    }   
 })
 app.listen(3001, ()=>{console.log('Backend server live on port 3001')});
