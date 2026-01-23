@@ -1,6 +1,7 @@
 {
-  "/api/files/route": "app/api/files/route.js",
+  "/api/auth/route": "app/api/auth/route.js",
   "/api/upload/route": "app/api/upload/route.js",
-  "/main/page": "app/main/page.js",
-  "/auth/page": "app/auth/page.js"
+  "/api/files/route": "app/api/files/route.js",
+  "/auth/page": "app/auth/page.js",
+  "/main/page": "app/main/page.js"
 }
