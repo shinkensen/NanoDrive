@@ -17,22 +17,29 @@ app.use(cors());
 app.use(express.json({ limit: '500gb' }));
 app.use(express.text({ type: 'text/plain', limit: '1mb' }));
 app.use('/uploads',express.static('uploads'));
-app.post('/upload', upload.single('file'), (req,res) =>{
-    if  (!req.file){
-        return res.status(400).json({error: "File not uploaded"})
+app.post('/upload', upload.array('file'), async (req, res) => {
+    try {
+        const files = Array.isArray(req.files) ? req.files : [];
+        if (!files.length) return res.status(400).json({ error: "File not uploaded" });
+        const name = req.body.name || '';
+
+        const inserted = await Promise.all(files.map(file => new Promise((resolve, reject) => {
+            const { filename, mimetype, size, path: filePath } = file;
+            const storedPath = path.resolve(process.cwd(), filePath);
+            db.run(`INSERT INTO uploads (name, file_name, mime_type, path, size) VALUES (?,?,?,?,?)`,
+                [name, filename, mimetype, storedPath, size],
+                function (err) {
+                    if (err) return reject(err);
+                    resolve({ id: this.lastID, name, filename, mimetype, size, url: `/uploads/${filename}` });
+                }
+            );
+        })));
+
+        return res.json(inserted);
+    } catch (err) {
+        return res.status(500).json({ error: err?.message || 'Upload failed' });
     }
-    const name = req.body.name;
-    const {filename,mimetype,size,path:filePath} = req.file;
-    // Store absolute path so later cleanup does not depend on process.cwd()
-    const storedPath = path.resolve(process.cwd(), filePath);
-    db.run(`INSERT INTO uploads (name, file_name, mime_type, path, size) VALUES (?,?,?,?,?)`,
-        [name, filename, mimetype, storedPath, size],
-        function (err){
-            if (err) return res.status(500).json({error: err.message});
-            return res.json({id: this.lastID,name,filename,mimetype,size,url: `/uploads/${filename}`})
-        }
-    )
-})
+});
 function getPass(callback){
     db.get('SELECT password FROM pass WHERE id = 1', [], (err, row) => {
         if (err) {

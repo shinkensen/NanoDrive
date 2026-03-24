@@ -1,0 +1,6 @@
+Here we go:
+
+File Encryption
+Security as in outsiders cannot access this
+Security as in share links for cross "user" sharing or the ability for absolutley anyone to use this world wide
+- this can be done via Hack Club's CDN

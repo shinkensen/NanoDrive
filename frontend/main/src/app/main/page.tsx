@@ -105,16 +105,18 @@ export default function MainPage() {
     setProgress(0);
     setSpeedBps(0);
 
+    const items = Array.isArray(uploaded) ? uploaded : [uploaded];
+    const now = new Date().toISOString();
     setFiles((prev) => [
-      {
-        id: uploaded.id,
-        name: uploaded.name,
-        file_name: uploaded.filename,
-        mime_type: uploaded.mimetype,
-        path: uploaded.url,
-        size: uploaded.size,
-        time: new Date().toISOString(),
-      },
+      ...items.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        file_name: u.filename,
+        mime_type: u.mimetype,
+        path: u.url,
+        size: u.size,
+        time: now,
+      })),
       ...prev,
     ]);
     loadFiles();
@@ -128,7 +130,7 @@ export default function MainPage() {
     <div className="page">
       <h1>NanoDrive</h1>
       <form onSubmit={upload} className="upload-box">
-        <input name="file" type="file" required />
+        <input name="file" type="file" required multiple/>
         <input name="name" required placeholder="name" />
         <button type="submit" disabled={busy}>
           {busy ? `Uploading…${formatSpeed(speedBps)}` : 'Upload'}
@@ -143,7 +145,7 @@ export default function MainPage() {
       {error && <p className="error">{error}</p>}
       <div className="list">
         {files.map((f) => (
-          <div key={f.id} className="card">
+          <div key={`${f.id}-${f.file_name}`} className="card">
             <div className="name">{f.name}</div>
             <div className="meta">
               {f.mime_type} • {(f.size / 1024).toFixed(1)} KB

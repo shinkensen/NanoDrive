@@ -1,5 +1,4 @@
 What steps next?
-Maybe support for multiple files, or file conversions via ffmpeg
 Maybe additional security features
 Better frontend expirence, customizable themes
 Personalized storage partitions essentially, with specfifc users
